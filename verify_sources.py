@@ -10,10 +10,10 @@ ok = True
 def head(t): print(f"\n=== {t} ===")
 
 
-head("1) GeckoTerminal network id")
+head("1) GeckoTerminal network id（仅提示，不作为 FAIL 依据）")
 nets = S.gt_networks()
 if not nets:
-    print("FAIL: 拿不到 network 列表"); ok = False
+    print("  拿不到 network 列表（提示，不判 FAIL）")
 else:
     print(f"共 {len(nets)} 条链")
     for key, want in GT_NETWORKS.items():
@@ -21,19 +21,20 @@ else:
         print(f"  {key:10s} config={want:12s} {'OK' if hit else 'NOT FOUND'}")
         if not hit:
             guess = [n for n in nets if key[:3] in n]
-            print(f"     >>> 候选: {guess[:8]}  ← 回填 config.GT_NETWORKS")
-            ok = False
+            print(f"     >>> 候选: {guess[:8]}  ← 仅供参考，以第 2 步 new_pools 为准")
 
-head("2) 三链新池抓取")
+head("2) 三链新池抓取（权威判定：scan.py 实际调用的就是这个端点）")
 for key in GT_NETWORKS:
+    url = f"{S.GT}/networks/{GT_NETWORKS[key]}/new_pools"
+    print(f"  {key}: GET {url}")
     try:
         pools = S.gt_new_pools(key)
     except Exception as e:
-        print(f"  {key}: FAIL {e}"); ok = False; continue
+        print(f"     FAIL {e}"); ok = False; continue
     if not pools:
-        print(f"  {key}: 空（可能是 id 错或该链暂无新池）"); continue
+        print("     FAIL 返回空（id 错或该链暂无新池）"); ok = False; continue
     v = S.pool_view(pools[0], key)
-    print(f"  {key}: {len(pools)} 个池，样例 {v['name']} dex={v['dex']} "
+    print(f"     {len(pools)} 个池，样例 {v['name']} dex={v['dex']} "
           f"liq=${v['liq']:,.0f} age={v['age_min']:.1f}m")
     print(f"     dex 分布: {sorted({S.pool_view(p, key)['dex'] for p in pools})}")
 
@@ -57,6 +58,9 @@ for key in GT_NETWORKS:
     from core.security import check
     sec = check(key, ca)
     print(f"  security({key}, {ca[:10]}…) risks={sec['risks']} notes={sec['notes']}")
+    if key == "bsc" and any(str(n).startswith("税 买?") for n in sec["notes"]):
+        # 新币还没进 honeypot.is 的库时该端点返回 404，不是源挂了，别每次重新判断
+        print("     honeypot.is 404：该币未进库，属正常，非源故障")
 
 head("结论")
 print("PASS，可以进入第 5 步" if ok else "有 FAIL 项，先回填 config.py 再重跑")

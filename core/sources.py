@@ -7,10 +7,19 @@ DS = "https://api.dexscreener.com"
 
 
 # ---------- 发现层：GeckoTerminal ----------
-def gt_networks():
-    """预检用：列出所有可用 network id。"""
-    d = get_json(f"{GT}/networks")
-    return [x["id"] for x in (d or {}).get("data", [])]
+def gt_networks(max_pages: int = 20):
+    """预检用：列出所有可用 network id。
+    按响应里的 links.next 翻页（API 自己告诉最后一页），不用试探到报错为止。"""
+    ids, page = [], 1
+    while page <= max_pages:
+        d = get_json(f"{GT}/networks", {"page": page})
+        if not d:
+            break
+        ids.extend(x["id"] for x in d.get("data", []))
+        if not ((d.get("links") or {}).get("next")):
+            break
+        page += 1
+    return ids
 
 
 def gt_new_pools(chain_key: str, page: int = 1):
