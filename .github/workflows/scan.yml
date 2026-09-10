@@ -1,0 +1,38 @@
+name: scan
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: radar
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python scan.py
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TG_THREAD_SCAN: ${{ secrets.TG_THREAD_SCAN }}
+      - name: commit state
+        run: |
+          git config user.name "radar-bot"
+          git config user.email "radar@users.noreply.github.com"
+          git add -A state data
+          git diff --cached --quiet && exit 0
+          git commit -m "state: $(date -u +%FT%TZ)"
+          for i in 1 2 3; do
+            git pull --rebase --autostash && git push && exit 0
+            sleep 5
+          done
+          exit 1
